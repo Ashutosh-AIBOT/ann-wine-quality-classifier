@@ -11,10 +11,10 @@ ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
 WORKDIR /app
 
 # Install system dependencies
+# Simplified to only essential packages for Streamlit + PyTorch
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    software-properties-common \
     git \
     && rm -rf /var/lib/apt/lists/*
 
@@ -25,11 +25,14 @@ COPY requirements.txt .
 # Using CPU-only torch to minimize image size for Hugging Face Spaces
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the current directory contents into the container at /app
-COPY . .
-
 # Create a non-root user and switch to it for Hugging Face security
 RUN useradd -m -u 1000 user
+
+# Copy the rest of the application code as the non-root user
+# This ensures that the user has write permissions where needed
+COPY --chown=user:user . .
+
+# Set environment variables for the non-root user
 USER user
 ENV HOME=/home/user \
 	PATH=/home/user/.local/bin:$PATH
