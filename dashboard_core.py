@@ -47,20 +47,34 @@ FEATURES = [
 _cache = {}
 
 
-def load_model_and_scaler():
+def load_model_and_scaler() -> tuple[WineANN | None, any | None]:
     if _cache:
-        return _cache["model"], _cache["scaler"]
+        return _cache.get("model"), _cache.get("scaler")
 
-    with open(DATA_PROCESSED / "scaler.pkl", "rb") as f:
-        scaler = pickle.load(f)
+    try:
+        scaler_path = DATA_PROCESSED / "scaler.pkl"
+        if not scaler_path.exists():
+            print(f"❌ Error: {scaler_path} missing.")
+            return None, None
+            
+        with open(scaler_path, "rb") as f:
+            scaler = pickle.load(f)
 
-    model = WineANN(input_dim=11)
-    model.load_state_dict(torch.load(MODELS / "model.pkl", map_location="cpu"))
-    model.eval()
+        model_path = MODELS / "model.pkl"
+        if not model_path.exists():
+            print(f"❌ Error: {model_path} missing.")
+            return None, None
 
-    _cache["model"] = model
-    _cache["scaler"] = scaler
-    return model, scaler
+        model = WineANN(input_dim=11)
+        model.load_state_dict(torch.load(model_path, map_location="cpu"))
+        model.eval()
+
+        _cache["model"] = model
+        _cache["scaler"] = scaler
+        return model, scaler
+    except Exception as e:
+        print(f"❌ Unexpected Error: {e}")
+        return None, None
 
 
 def predict_class(features_dict: dict):
