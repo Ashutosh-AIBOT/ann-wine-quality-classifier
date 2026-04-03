@@ -4,14 +4,22 @@ import pandas as pd
 import seaborn as sns
 import streamlit as st
 
-from dashboard_core import get_classification_report, get_training_history, predict_class
+from dashboard_core import get_classification_report, get_training_history, predict_class, load_model_and_scaler
 from path_utils import CHARTS
 
 st.set_page_config(page_title="Wine Quality Classifier", layout="wide")
 st.title("Wine Quality Multi-class Predictor")
 st.caption("Raw wine features -> saved scaler -> ANN logits -> softmax probabilities")
 
-st.sidebar.header("Wine Chemistry Inputs")
+# --- HEALTH CHECK ---
+model, scaler = load_model_and_scaler()
+with st.sidebar:
+    st.header("Wine Chemistry Inputs")
+    if model and scaler:
+        st.success("✅ System Ready: Model & Scaler Loaded")
+    else:
+        st.error("❌ System Error: Missing Model/Scaler Artifacts")
+        st.info("Ensure `models/` and `data/processed/` folders are populated.")
 
 features = {
     "fixed acidity": st.sidebar.slider("fixed acidity", 4.0, 16.0, 8.0, 0.1),
@@ -30,27 +38,30 @@ features = {
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-if st.button("Predict Quality"):
-    pred, probs = predict_class(features)
-    labels = ["Low (0)", "Medium (1)", "High (2)"]
-    st.session_state.prediction_history.append(probs)
+if st.button("Predict Quality", disabled=(model is None)):
+    try:
+        pred, probs = predict_class(features)
+        labels = ["Low (0)", "Medium (1)", "High (2)"]
+        st.session_state.prediction_history.append(probs)
 
-    st.subheader("Live Prediction Result")
-    c1, c2 = st.columns([1, 1])
-    with c1:
-        st.metric("Predicted Class", labels[pred])
-        st.metric("Confidence", f"{max(probs):.3f}")
-    with c2:
-        st.write("Class probabilities")
-        prob_df = pd.DataFrame({"class": labels, "probability": probs})
-        st.bar_chart(prob_df.set_index("class"))
+        st.subheader("Live Prediction Result")
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            st.metric("Predicted Class", labels[pred])
+            st.metric("Confidence", f"{max(probs):.3f}")
+        with c2:
+            st.write("Class probabilities")
+            prob_df = pd.DataFrame({"class": labels, "probability": probs})
+            st.bar_chart(prob_df.set_index("class"))
 
-    hist_df = pd.DataFrame(
-        st.session_state.prediction_history,
-        columns=["Low (0)", "Medium (1)", "High (2)"],
-    )
-    st.line_chart(hist_df)
-    st.caption("Live prediction history (updates on each Predict click).")
+        hist_df = pd.DataFrame(
+            st.session_state.prediction_history,
+            columns=["Low (0)", "Medium (1)", "High (2)"],
+        )
+        st.line_chart(hist_df)
+        st.caption("Live prediction history (updates on each Predict click).")
+    except Exception as e:
+        st.error(f"Prediction Error: {e}")
 
 curves_tab, cm_tab, f1_tab, arch_tab = st.tabs(
     ["Training Curves", "Confusion Matrix", "Per-class F1", "Model & Metrics Guide"]
